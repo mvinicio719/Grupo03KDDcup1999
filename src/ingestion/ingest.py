@@ -6,27 +6,34 @@ DIR_DESTINO = "data/raw"
 ARCHIVO_CSV = os.path.join(DIR_DESTINO, "kddcup_10_percent.csv")
 
 def ejecutar_ingesta():
+    # Crear carpeta data/raw si no existe
     os.makedirs(DIR_DESTINO, exist_ok=True)
     
     print("Descargando dataset KDD Cup 1999 mediante Scikit-Learn...")
     
-    # Descargar versión reducida del 10% (percent10=True) y decodificar bytes a strings (decode_toks=True)
-    dataset = fetch_kddcup99(subset=None, percent10=True, as_frame=True, decode_toks=True)
+    # Se elimina 'decode_toks' para evitar incompatibilidad de versión
+    dataset = fetch_kddcup99(subset=None, percent10=True, as_frame=True)
     
-    # Extraer el DataFrame completo con características y columna 'target' / 'labels'
+    # Obtener el DataFrame con características y la etiqueta target
     df = dataset.frame
     
-    # Renombrar la última columna a 'label' para estandarizar
+    # Convertir columnas tipo bytes a cadenas (strings) si es necesario
+    for col in df.columns:
+        if df[col].dtype == object or str(df[col].dtype).startswith('bytes'):
+            df[col] = df[col].apply(lambda x: x.decode('utf-8') if isinstance(x, bytes) else x)
+    
+    # Renombrar la columna objetivo a 'label'
     if 'target' in df.columns:
         df = df.rename(columns={'target': 'label'})
     elif 'labels' in df.columns:
         df = df.rename(columns={'labels': 'label'})
     
-    # Guardar CSV limpio localmente
+    # Guardar CSV localmente
     df.to_csv(ARCHIVO_CSV, index=False)
     
-    print(f"Ingesta completada con éxito. Guardado en: {ARCHIVO_CSV}")
-    print(f"Filas cargadas: {df.shape[0]} | Columnas: {df.shape[1]}")
+    print(f"\n¡Ingesta completada con éxito!")
+    print(f"Archivo guardado en: {ARCHIVO_CSV}")
+    print(f"Dimensiones: {df.shape[0]} filas | {df.shape[1]} columnas")
 
 if __name__ == "__main__":
     ejecutar_ingesta()
