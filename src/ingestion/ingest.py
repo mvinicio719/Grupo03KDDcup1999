@@ -1,11 +1,6 @@
-import pandas as pd
-import urllib.request
-import gzip
 import os
-
-# 1. Definir URLs oficiales y rutas
-URL_DATOS = "http://kdd.ics.uci.edu/databases/kddcup99/kddcup.data_10_percent.gz"
-URL_NOMBRES = "http://kdd.ics.uci.edu/databases/kddcup99/kddcup.names"
+import pandas as pd
+from sklearn.datasets import fetch_kddcup99
 
 DIR_DESTINO = "data/raw"
 ARCHIVO_CSV = os.path.join(DIR_DESTINO, "kddcup_10_percent.csv")
@@ -14,28 +9,31 @@ def ejecutar_ingesta():
     # Crear carpeta data/raw si no existe
     os.makedirs(DIR_DESTINO, exist_ok=True)
     
-    print(" Descargando nombres de columnas...")
-    nombres_req = urllib.request.urlopen(URL_NOMBRES).read().decode('utf-8')
-    # Extraer los nombres de las columnas del archivo .names
-    columnas = [linea.split(':')[0] for linea in nombres_req.split('\n') if ':' in linea]
-    columnas.append('label') # Agregar la columna objetivo (si es ataque o normal)
-
-    print(" Descargando y descomprimiendo dataset...")
-    gz_path = os.path.join(DIR_DESTINO, "kddcup.gz")
-    urllib.request.urlretrieve(URL_DATOS, gz_path)
-
-    # Leer el archivo .gz comprimido directamente con Pandas
-    df = pd.read_csv(gz_path, header=None, names=columnas)
+    print("Descargando dataset KDD Cup 1999 mediante Scikit-Learn...")
     
-    # Guardar como CSV limpio localmente
+    # Se elimina 'decode_toks' para evitar incompatibilidad de versión
+    dataset = fetch_kddcup99(subset=None, percent10=True, as_frame=True)
+    
+    # Obtener el DataFrame con características y la etiqueta target
+    df = dataset.frame
+    
+    # Convertir columnas tipo bytes a cadenas (strings) si es necesario
+    for col in df.columns:
+        if df[col].dtype == object or str(df[col].dtype).startswith('bytes'):
+            df[col] = df[col].apply(lambda x: x.decode('utf-8') if isinstance(x, bytes) else x)
+    
+    # Renombrar la columna objetivo a 'label'
+    if 'target' in df.columns:
+        df = df.rename(columns={'target': 'label'})
+    elif 'labels' in df.columns:
+        df = df.rename(columns={'labels': 'label'})
+    
+    # Guardar CSV localmente
     df.to_csv(ARCHIVO_CSV, index=False)
     
-    # Borrar el .gz temporal
-    if os.path.exists(gz_path):
-        os.remove(gz_path)
-        
-    print(f" Ingesta completada con éxito. Guardado en: {ARCHIVO_CSV}")
-    print(f" Filas cargadas: {df.shape[0]} | Columnas: {df.shape[1]}")
+    print(f"\n¡Ingesta completada con éxito!")
+    print(f"Archivo guardado en: {ARCHIVO_CSV}")
+    print(f"Dimensiones: {df.shape[0]} filas | {df.shape[1]} columnas")
 
 if __name__ == "__main__":
     ejecutar_ingesta()
